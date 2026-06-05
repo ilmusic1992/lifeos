@@ -2057,7 +2057,7 @@ async function sendTest(){
 function more(){
   return`<div style="font-size:20px;font-weight:800;margin-bottom:14px">עוד</div>
 <div class="card">
-  ${[['tasks_page','\u2705 \u05de\u05e9\u05d9\u05de\u05d5\u05ea \u05e4\u05ea\u05d5\u05d7\u05d5\u05ea'],['\u05d2\u05d5\u05d0\u05dc\u05e1','\ud83c\udfaf \u05d9\u05e2\u05d3\u05d9\u05dd'],['journal','\ud83d\udcd3 \u05d9\u05d5\u05de\u05df'],['food','\ud83e\udd57 \u05ea\u05d6\u05d5\u05e0\u05d4'],['progress_page','\ud83d\udcc8 \u05d2\u05e8\u05e3 \u05d4\u05ea\u05e7\u05d3\u05de\u05d5\u05ea'],['telegram','\u2709\ufe0f \u05d1\u05d5\u05d8 Telegram']].map(([p,l])=>`
+  ${[['tasks_page','\u2705 \u05de\u05e9\u05d9\u05de\u05d5\u05ea \u05e4\u05ea\u05d5\u05d7\u05d5\u05ea'],['journal','\ud83d\udcd3 \u05d9\u05d5\u05de\u05df'],['food','\ud83e\udd57 \u05ea\u05d6\u05d5\u05e0\u05d4'],['progress_page','\ud83d\udcc8 \u05d2\u05e8\u05e3 \u05d4\u05ea\u05e7\u05d3\u05de\u05d5\u05ea'],['telegram','\u2709\ufe0f \u05d1\u05d5\u05d8 Telegram']].map(([p,l])=>`
   <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="navigate('${p}')">
     <span style="font-size:15px;font-weight:500">${l}</span>
     <i class="fas fa-chevron-left" style="color:var(--txt2);font-size:12px"></i>
@@ -2078,6 +2078,11 @@ let progressChart=null;
 function progress_page(){
   const log=window.State.data.dailyLog||{};
   const tasks=window.State.data.dailyTasks||[];
+  const habitLog=window.State.data.habitLog||{};
+  const smokeHabit=(window.State.data.habits||[]).find(h=>h.id==='h_smoke');
+  const hHabit=(window.State.data.habits||[]).find(h=>h.id==='h_h');
+  const smokeGoal=smokeHabit?.goal||10;
+  const hGoal=hHabit?.goal||3;
   const days=[];
   for(let i=29;i>=0;i--){
     const d=new Date();d.setDate(d.getDate()-i);
@@ -2087,13 +2092,20 @@ function progress_page(){
     const maxPts=dayTasks.reduce((s,t)=>s+(t.pts||1),0);
     const donePts=dayTasks.filter(t=>(log[key]||{})[t.id]).reduce((s,t)=>s+(t.pts||1),0);
     const pct=maxPts>0?Math.round(donePts/maxPts*100):0;
-    days.push({key,label:d.toLocaleDateString('he-IL',{day:'numeric',month:'short'}),pts:donePts,max:maxPts,pct});
+    const smokeVal=(habitLog[key]||{})['h_smoke']||0;
+    const hVal=(habitLog[key]||{})['h_h']||0;
+    days.push({key,label:d.toLocaleDateString('he-IL',{day:'numeric',month:'short'}),pts:donePts,max:maxPts,pct,smoke:smokeVal,h:hVal});
   }
   const activeDays=days.filter(d=>d.max>0);
   const avg=activeDays.length?Math.round(activeDays.reduce((s,d)=>s+d.pct,0)/activeDays.length):0;
   const best=days.reduce((b,d)=>d.pts>b.pts?d:b,{pts:0,label:''});
   let streak=0;for(let i=days.length-1;i>=0;i--){if(days[i].max===0)continue;if(days[i].pct>=50)streak++;else break;}
   const monthScore=calcMonthScore();
+  // All-time totals
+  let totalSmoke=0,totalH=0;
+  Object.values(habitLog).forEach(d=>{totalSmoke+=(d['h_smoke']||0);totalH+=(d['h_h']||0);});
+  (window.State.data.smoke?.history||[]).forEach(e=>{totalSmoke+=e.val;});
+  (window.State.data.h?.history||[]).forEach(e=>{totalH+=e.val;});
 
   return`
 <div style="font-size:20px;font-weight:800;margin-bottom:16px">\ud83d\udcc8 \u05d2\u05e8\u05e3 \u05d4\u05ea\u05e7\u05d3\u05de\u05d5\u05ea</div>
@@ -2104,6 +2116,30 @@ function progress_page(){
 <div class="g2" style="margin-bottom:14px">
   <div class="metric"><div class="val" style="color:var(--orange)">${streak}</div><div class="lbl">\ud83d\udd25 \u05e8\u05e6\u05e3 \u05e0\u05d5\u05db\u05d7\u05d9</div></div>
   <div class="metric"><div class="val" style="color:var(--yellow)">${best.pts}</div><div class="lbl">\u05e9\u05d9\u05d0 \u05d9\u05d5\u05de\u05d9</div></div>
+</div>
+<div class="card" style="margin-bottom:12px">
+  <div class="card-title">🌬️ ע׳ וח׳ — מעקב 30 ימים</div>
+  <div class="g2" style="margin-bottom:12px">
+    <div class="metric" style="border-color:rgba(247,90,110,.25)">
+      <div class="val" style="color:var(--red);font-size:28px">${totalSmoke}</div>
+      <div class="lbl">סה"כ ע׳ מתחילת תיעוד</div>
+    </div>
+    <div class="metric" style="border-color:rgba(244,114,182,.25)">
+      <div class="val" style="color:var(--pink);font-size:28px">${totalH}</div>
+      <div class="lbl">סה"כ ח׳ מתחילת תיעוד</div>
+    </div>
+  </div>
+  <div style="font-size:12px;color:var(--txt2);margin-bottom:6px;font-weight:600">🌬️ ע׳ — יעד: עד ${smokeGoal} ביום</div>
+  <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">
+    ${days.map(d=>{const ok=d.smoke<=smokeGoal;const has=d.smoke>0;const col=!has?'var(--bg4)':ok?'var(--green)':'var(--red)';return'<div title="'+d.label+': '+d.smoke+'" style="width:28px;height:28px;border-radius:5px;background:'+col+';display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">'+( has?d.smoke:'')+'</div>';}).join('')}
+  </div>
+  <div style="font-size:12px;color:var(--txt2);margin-bottom:6px;font-weight:600">🛡️ ח׳ — יעד: עד ${hGoal} ביום</div>
+  <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+    ${days.map(d=>{const ok=d.h<=hGoal;const has=d.h>0;const col=!has?'var(--bg4)':ok?'var(--green)':'var(--red)';return'<div title="'+d.label+': '+d.h+'" style="width:28px;height:28px;border-radius:5px;background:'+col+';display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">'+( has?d.h:'')+'</div>';}).join('')}
+  </div>
+  <div style="display:flex;gap:12px;font-size:11px;color:var(--txt2)">
+    <span style="color:var(--green)">■ עמדתי</span><span style="color:var(--red)">■ חרגתי</span><span>□ לא תועד</span>
+  </div>
 </div>
 <div class="card" style="margin-bottom:12px">
   <div class="card-title">\ud83d\udcca \u05e0\u05e7\u05d5\u05d3\u05d5\u05ea \u05d9\u05d5\u05de\u05d9\u05d5\u05ea \u2014 30 \u05d9\u05d5\u05dd \u05d0\u05d7\u05e8\u05d5\u05e0\u05d9\u05dd</div>
