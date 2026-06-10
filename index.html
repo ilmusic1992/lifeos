@@ -2092,20 +2092,36 @@ function progress_page(){
     const maxPts=dayTasks.reduce((s,t)=>s+(t.pts||1),0);
     const donePts=dayTasks.filter(t=>(log[key]||{})[t.id]).reduce((s,t)=>s+(t.pts||1),0);
     const pct=maxPts>0?Math.round(donePts/maxPts*100):0;
+    // ע׳ and ח׳ can be stored in habitLog OR in smoke/h daily counters
     const smokeVal=(habitLog[key]||{})['h_smoke']||0;
     const hVal=(habitLog[key]||{})['h_h']||0;
-    days.push({key,label:d.toLocaleDateString('he-IL',{day:'numeric',month:'short'}),pts:donePts,max:maxPts,pct,smoke:smokeVal,h:hVal});
+    // Also check smoke.history and h.history for past days
+    const smokeHist=(window.State.data.smoke?.history||[]).find(e=>e.date===key);
+    const hHist=(window.State.data.h?.history||[]).find(e=>e.date===key);
+    const finalSmoke=smokeVal||(smokeHist?.val)||0;
+    const finalH=hVal||(hHist?.val)||0;
+    days.push({key,label:d.toLocaleDateString('he-IL',{day:'numeric',month:'short'}),pts:donePts,max:maxPts,pct,smoke:finalSmoke,h:finalH});
   }
   const activeDays=days.filter(d=>d.max>0);
   const avg=activeDays.length?Math.round(activeDays.reduce((s,d)=>s+d.pct,0)/activeDays.length):0;
   const best=days.reduce((b,d)=>d.pts>b.pts?d:b,{pts:0,label:''});
   let streak=0;for(let i=days.length-1;i>=0;i--){if(days[i].max===0)continue;if(days[i].pct>=50)streak++;else break;}
   const monthScore=calcMonthScore();
-  // All-time totals
+  // All-time totals - combine all sources
   let totalSmoke=0,totalH=0;
+  // From habitLog
   Object.values(habitLog).forEach(d=>{totalSmoke+=(d['h_smoke']||0);totalH+=(d['h_h']||0);});
-  (window.State.data.smoke?.history||[]).forEach(e=>{totalSmoke+=e.val;});
-  (window.State.data.h?.history||[]).forEach(e=>{totalH+=e.val;});
+  // From history arrays (older data)
+  (window.State.data.smoke?.history||[]).forEach(e=>{
+    // Only add if not already in habitLog
+    if(!(habitLog[e.date]&&habitLog[e.date]['h_smoke']))totalSmoke+=e.val;
+  });
+  (window.State.data.h?.history||[]).forEach(e=>{
+    if(!(habitLog[e.date]&&habitLog[e.date]['h_h']))totalH+=e.val;
+  });
+  // Today's values
+  totalSmoke+=(window.State.data.smoke?.today||0);
+  totalH+=(window.State.data.h?.today||0);
 
   return`
 <div style="font-size:20px;font-weight:800;margin-bottom:16px">\ud83d\udcc8 \u05d2\u05e8\u05e3 \u05d4\u05ea\u05e7\u05d3\u05de\u05d5\u05ea</div>
