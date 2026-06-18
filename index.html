@@ -1187,6 +1187,14 @@ function workout(){
   return`
 <div style="font-size:20px;font-weight:800;margin-bottom:16px">💪 אימונים</div>
 
+<button onclick="startFreeWorkout()" style="width:100%;background:linear-gradient(135deg,rgba(124,109,250,.15),rgba(124,109,250,.05));border:1.5px dashed rgba(124,109,250,.4);border-radius:var(--radius-sm);padding:14px 16px;text-align:right;cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;-webkit-tap-highlight-color:transparent">
+  <div>
+    <div style="font-size:14px;font-weight:700;color:var(--accent2)">🏃 אימון חופשי / מזדמן</div>
+    <div style="font-size:11px;color:var(--txt2);margin-top:3px">בית מלון, פארק, או כל מקום אחר</div>
+  </div>
+  <span style="font-size:22px;color:var(--accent2)">▶</span>
+</button>
+
 ${groups.map(g=>`
 <div class="slbl">קבוצה ${g}</div>
 <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
@@ -1366,6 +1374,51 @@ function calcNextWeight(lastSets, setIdx, targetReps, fallback){
   return baseW;
 }
 
+function startFreeWorkout(){
+  openModal('<div class="modal-title">אימון חופשי <button class="modal-close" onclick="closeModal()">✕</button></div>'
+    +'<input class="inp" id="fwName" placeholder="שם האימון (למשל: אימון בבית מלון)">'
+    +'<div id="fwExList"></div>'
+    +'<button class="btn btn-g btn-full" style="margin-bottom:8px" onclick="addFwEx()">+ הוסף תרגיל</button>'
+    +'<button class="btn btn-p btn-full" onclick="saveFreeWorkout()">התחל אימון ▶</button>');
+  window._fwExercises=[];
+  addFwEx();
+}
+function addFwEx(){
+  if(!window._fwExercises)window._fwExercises=[];
+  window._fwExercises.push({name:'',sets:3,reps:10,weight:0});
+  renderFwExList();
+}
+function renderFwExList(){
+  const el=document.getElementById('fwExList');if(!el)return;
+  el.innerHTML=window._fwExercises.map((ex,i)=>'<div style="background:var(--bg3);border-radius:8px;padding:10px;margin-bottom:8px">'
+    +'<input class="inp" value="'+ex.name+'" placeholder="שם תרגיל" onchange="window._fwExercises['+i+'].name=this.value" style="margin-bottom:6px">'
+    +'<div style="display:flex;gap:6px">'
+    +'<input class="inp" type="number" value="'+ex.sets+'" placeholder="סטים" onchange="window._fwExercises['+i+'].sets=parseInt(this.value)||3" style="margin:0;flex:1">'
+    +'<input class="inp" type="number" value="'+ex.reps+'" placeholder="חזרות" onchange="window._fwExercises['+i+'].reps=parseInt(this.value)||10" style="margin:0;flex:1">'
+    +'<input class="inp" type="number" value="'+ex.weight+'" placeholder="משקל" onchange="window._fwExercises['+i+'].weight=parseFloat(this.value)||0" style="margin:0;flex:1">'
+    +'<button class="ibtn" onclick="window._fwExercises.splice('+i+',1);renderFwExList()">✕</button>'
+    +'</div></div>').join('');
+}
+function saveFreeWorkout(){
+  const name=document.getElementById('fwName')?.value?.trim()||'אימון חופשי';
+  if(!window._fwExercises||!window._fwExercises.length){toast('הוסף לפחות תרגיל אחד','error');return;}
+  const exercises=window._fwExercises.map(ex=>({
+    name:ex.name||'תרגיל',
+    targetSets:ex.sets||3,
+    targetReps:ex.reps||10,
+    warmup:false,
+    note:'',
+    lastSets:[],
+    sets:[...Array(ex.sets||3)].map(()=>({targetW:ex.weight||0,targetR:ex.reps||10,w:0,r:0,done:false}))
+  }));
+  window.State.data.activeWorkout={
+    id:genId(),templateId:null,name:name,
+    date:todayKey(),exercises,currentEx:0
+  };
+  window.State.save();
+  closeModal();
+  window.renderPage('workout');
+}
 function startBotWorkout(tid){
   const tpl=(window.State.data.workoutTemplates||[]).find(t=>t.id===tid);if(!tpl)return;
   const lastW=(window.State.data.workouts||[]).filter(w=>w.templateId===tid).slice(-1)[0];
@@ -2063,6 +2116,12 @@ function more(){
     <i class="fas fa-chevron-left" style="color:var(--txt2);font-size:12px"></i>
   </div>`).join('')}
 </div>
+<div class="card" style="margin-top:10px;border-color:rgba(247,90,110,.2)">
+  <div style="text-align:center;padding:8px">
+    <div style="font-size:12px;color:var(--txt2);margin-bottom:8px">מחיקת כל הנתונים האישיים</div>
+    <button class="btn btn-d btn-full" onclick="confirmReset()">&#x1F5D1;&#xFE0F; איפוס מלא של כל הנתונים</button>
+  </div>
+</div>
 <div class="card" style="margin-top:10px">
   <div style="text-align:center;padding:10px">
     <div style="font-size:28px;margin-bottom:8px">\u26a1</div>
@@ -2072,6 +2131,22 @@ function more(){
     <div style="font-size:11px;color:var(--txt2)">\u05e0\u05e7\u05d5\u05d3\u05d5\u05ea \u05d4\u05d7\u05d5\u05d3\u05e9</div>
   </div>
 </div>`;
+}
+
+function confirmReset(){
+  openModal('<div class="modal-title" style="color:var(--red)">&#x26A0;&#xFE0F; איפוס מלא <button class="modal-close" onclick="closeModal()">&#x2715;</button></div>'
+    +'<div style="font-size:14px;line-height:1.7;margin-bottom:16px;color:var(--txt2)">פעולה זו תמחק את <strong style="color:var(--txt)">כל הנתונים שלך</strong> לצמיתות.<br>לא ניתן לשחזר!</div>'
+    +'<input class="inp" id="resetConfirm" placeholder="הקלד: מאשר מחיקה">'
+    +'<button class="btn btn-d btn-full" onclick="executeReset()">מחק הכל לצמיתות</button>');
+}
+function executeReset(){
+  var val=document.getElementById('resetConfirm')&&document.getElementById('resetConfirm').value.trim();
+  if(val!=='מאשר מחיקה'){toast('הקלד בדיוק: מאשר מחיקה','error');return;}
+  window.State.data=JSON.parse(JSON.stringify(DEF));
+  window.State.save();
+  closeModal();
+  toast('כל הנתונים נמחקו! 🚀');
+  setTimeout(function(){window.renderPage('dashboard');},500);
 }
 
 let progressChart=null;
@@ -2208,6 +2283,26 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
   window.updateUI();
   if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+  // בדיקה כל דקה — אם עבר יום, אפס ספירות
+  setInterval(()=>{
+    const today=todayKey();
+    const data=window.State.data;
+    let changed=false;
+    ['smoke','h'].forEach(x=>{
+      if(data[x]&&data[x].lastDate&&data[x].lastDate!==today){
+        if(data[x].lastDate)data[x].history.push({date:data[x].lastDate,val:data[x].today});
+        data[x].today=0;data[x].lastDate=today;
+        changed=true;
+      }
+    });
+    // אפס גם dailyLog של יום קודם
+    if(changed){
+      window.State.save();
+      window.updateUI();
+      if(window.currentPage)window.renderPage(window.currentPage);
+    }
+  }, 60000); // כל דקה
 });
 </script>
 </body>
